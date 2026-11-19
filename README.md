@@ -1,4 +1,4 @@
-# Token Radar — a token launch radar (model radar-2)
+# Token Radar — a token launch radar (model radar-3)
 
 A program plus the static dashboard it writes. `main.ts` (Node 22, standard library only) reads the
 sealed DefiLlama snapshot at `/input/snapshot.json`, ranks every protocol that records no token yet by
@@ -64,12 +64,34 @@ token is increasingly one that has chosen never to launch, and the model prices 
 rewarding age without limit. An unrecorded age scores as 365 days.
 
 **Category priors** come from how each category's established protocols historically reached a
-token. Fee-taking apps almost all launch (Dexs 1.20, Lending 1.18, Derivatives 1.18, CDP 1.12,
-Prediction Market 1.10); yield and vault categories launch often but less uniformly (Yield 1.08,
-Risk Curators 1.02, Onchain Capital Allocator 1.02); wrappers and issuer products usually *are* a
-token already, or answer to an issuer that has one (Stablecoin Wrapper 0.75, BTC wrappers 0.80,
-RWA 0.85, Basis Trading 0.90). The full 33-category table is `MODEL.category_multipliers` in
-`lib/model.ts`; an unlisted category scores the neutral 1.0.
+token. Fee-taking apps almost all launch (Dexs 1.20, Lending 1.18, CDP 1.12, Prediction
+Market 1.10); yield and vault categories launch often but less uniformly (Yield 1.08); wrappers
+and issuer products usually *are* a token already, or answer to an issuer that has one
+(Stablecoin Wrapper 0.75, BTC wrappers 0.80). The full 33-category table is
+`MODEL.category_multipliers` in `lib/model.ts`; an unlisted category scores the neutral 1.0.
+
+**Round-2 sensitivity pass (radar-2 → radar-3).** Every prior was re-checked against the sealed
+snapshot itself — for each category, the share of its protocols that already record a token
+(758 protocols; 54.9% tokenized overall, 58.6% among the 319 at ≥ $50M TVL). Only moves with
+clear evidence were made; each is also documented at its line in `lib/model.ts`:
+
+| Category | Prior | Snapshot evidence |
+| --- | --- | --- |
+| Risk Curators | 1.02 → **0.92** | Only 5/39 tokenized (13%), 3/16 at ≥ $50M (19%) — the lowest large-sample rate in the snapshot, with billion-dollar curators 400–550 days old still tokenless. Part of the gap is youth (pre-token median age 186 days), so the cut stops well above the wrapper floor. |
+| Onchain Capital Allocator | 1.02 → **0.95** | 9/29 tokenized (31%), 5/13 at ≥ $50M; pre-token members are not young (median 517 days). Allocators often sit under a parent that already has a token — a small discount, since several of the largest did launch. |
+| Derivatives | 1.18 → **1.10** | 13/26 tokenized (50%), 6/9 at ≥ $50M — far below its round-1 peer tier (Dexs and Lending both convert 88% at ≥ $50M). A premium remains; parity does not survive the data. |
+| Cross Chain Bridge | 0.90 → **1.02** | 6/7 tokenized (86%), the highest rate of any discounted category; its tokenized members are old, established bridges (median ≈1,690 days). Small sample (n=7), so it rises only to just above neutral. |
+| Indexes | 1.00 → **1.08** | 5/6 tokenized (83%), 2/2 at ≥ $50M — an index product usually is, or launches, a token. Small sample (n=6), so the move is capped at the yield tier. |
+| Basis Trading | 0.90 → **1.00** | 13/21 tokenized (62%), 6/9 at ≥ $50M — above the snapshot average on a real sample, with tokenized and pre-token ages alike (≈512 vs ≈422 days), so the gap is not an age artifact. The discount is removed, with no premium: several large basis funds are still issuer balance sheets. |
+| Chain | 0.95 → **0.88** | 3/8 tokenized (38%), 1/3 at ≥ $50M, and pre-token members are old (median 872 days) — chains that were going to launch mostly have. |
+| RWA | 0.85 → **0.90** | 17/33 tokenized (52%), 8/16 at ≥ $50M — the snapshot average, not wrapper behaviour; pre-token RWAs are as large as tokenized ones (median $59M vs $47M TVL). A small discount remains for the issuer-balance-sheet structure. |
+
+Deliberately unchanged, with the check recorded in `lib/model.ts`: Dexs (73/99, 22/25 at
+≥ $50M — validates 1.20) and Lending (59/75, 30/34 — validates 1.18); CDP (6/7 at ≥ $50M —
+the size split validates 1.12 despite a 50% headline rate); Yield and Yield Aggregator (9/11
+and 4/5 at ≥ $50M — validate 1.08); Stablecoin Wrapper (0/2, both ≥ $50M — validates the 0.75
+floor); and every category with n ≤ 3 in the snapshot, where the round-1 judgement stands
+rather than fitting noise.
 
 The combined non-TVL spread is roughly ×0.4 to ×2.7 — enough for the model, not TVL, to decide the
 order of any two protocols within an order of magnitude of each other, which is exactly where a
@@ -89,8 +111,13 @@ protocol has run with no token on record.
 
 ## The dashboard
 
-`dashboard/` is three files (index.html, app.css, app.js) in the starter's plain theme. The board is
-sortable on every column and filterable by search text, category, and set (watchlist / early radar /
-both); every row opens a detail drawer with the full score breakdown and the farm plan; a Live token
-tab keeps already-trading protocols visibly separate. The page states the whole model, category
-priors included, and runs with no network.
+`dashboard/` is three files (index.html, app.css, app.js), fully static. The opening panel states
+what the radar is and why its ranking can be checked: complete coverage with stated limits, one
+public function with no name special-casing, and a live recompute proof in every row's drawer.
+The board is sortable on every column and filterable by search text, category, and set
+(watchlist / early radar / both); every row opens a detail drawer with a plain-language verdict
+(strongest lift, main drag), a bar-scaled score breakdown, the live-check proof, and the farm
+plan; a Live token tab keeps already-trading protocols visibly separate. The model panel states
+the whole formula as five factor cards and renders all 33 category priors grouped by band
+(above / at / below neutral) with scaled bars, instead of a single running list. The page runs
+with no network.

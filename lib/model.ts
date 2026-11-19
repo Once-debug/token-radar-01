@@ -9,7 +9,7 @@
 // screened those protocols by parent protocol, a field the snapshot does not carry, so a large
 // protocol the list leaves out cannot be verified from the ten fields and is not re-admitted.
 //
-// Implied value (model radar-2) follows only from the snapshot's own figures, as a product of five
+// Implied value (model radar-3) follows only from the snapshot's own figures, as a product of five
 // multipliers on a TVL base, so the ranking is a value model and not a TVL sort:
 //
 //   base       = tvl_usd x BASE_MULTIPLE          (a launch is worth a fraction of the TVL behind it)
@@ -105,33 +105,83 @@ export const MODEL: ModelConstants = {
   // One prior per DefiLlama category, from how that category's established protocols reached a
   // token: above 1 where a launch is the category's normal end state, below 1 where the product
   // itself is usually a token already (a wrapper) or an issuer's balance sheet (RWA, basis funds).
+  //
+  // Round 2 (radar-3) sensitivity pass — every prior was re-checked against the sealed snapshot
+  // itself (758 protocols; 54.9% already carry a token, 58.6% among the 319 at >= $50M TVL).
+  // "Token rate" below = share of the category's snapshot protocols that already record a token.
+  // Only the seven moves with clear evidence were made; each is marked [R2] with its figures.
+  // Priors left alone on purpose: Dexs (73/99 tokenized, 22/25 at >= $50M — the snapshot's
+  // strongest large-sample rate, validates 1.20) and Lending (59/75, 30/34 — validates 1.18);
+  // CDP (10/20 overall but 6/7 at >= $50M — the size split, not the headline rate, is the signal,
+  // validates 1.12); Yield / Yield Aggregator (9/11 and 4/5 at >= $50M — validate 1.08);
+  // Stablecoin Wrapper (0/2, both >= $50M and tokenless — validates the 0.75 floor);
+  // Prediction Market, Uncollateralized Lending, Interest Rate Derivatives, CDP Manager,
+  // Collateral Markets, OTC Marketplace (n <= 3 in the snapshot — no evidence either way, so the
+  // round-1 judgement stands rather than fitting noise).
   category_multipliers: {
     Dexs: 1.2,
     Lending: 1.18,
-    Derivatives: 1.18,
+    // [R2] 1.18 -> 1.10. Derivatives token rate is 13/26 (50%), and 6/9 at >= $50M — far below
+    // its round-1 peer tier (Dexs and Lending both convert 88% at >= $50M). Perp venues do
+    // launch, but the snapshot says not at lending/DEX reliability; 1.10 keeps a premium
+    // without claiming parity the data does not show.
+    Derivatives: 1.1,
     'Interest Rate Derivatives': 1.12,
     CDP: 1.12,
     'Prediction Market': 1.1,
     Yield: 1.08,
     'Yield Aggregator': 1.08,
     'Uncollateralized Lending': 1.08,
+    // [R2] 1.00 -> 1.08. Indexes tokenize at 5/6 (83%), 2/2 at >= $50M — an index product is
+    // usually itself the token or launches one. Small sample (n=6), so the move is capped at
+    // the yield tier rather than the fee-app tier.
+    Indexes: 1.08,
     'Leveraged Farming': 1.06,
     Farm: 1.05,
     'CDP Manager': 1.05,
     'Collateral Markets': 1.05,
-    'Risk Curators': 1.02,
-    'Onchain Capital Allocator': 1.02,
+    // [R2] 0.90 -> 1.02. Cross Chain Bridge was discounted as infrastructure, but the snapshot
+    // disagrees: 6/7 tokenized (86%), the highest rate of any discounted category, and its
+    // tokenized members are old, established bridges (median age ~1,690 days). Small sample
+    // (n=7), so it rises to just above neutral, not to the fee-app tier.
+    'Cross Chain Bridge': 1.02,
+    // [R2] 1.02 -> 0.92. Risk Curators is the snapshot's clearest disagreement: only 5/39
+    // tokenized (13%), 3/16 at >= $50M (19%) — by far the lowest large-sample rate — while
+    // billion-dollar curators (ages 400-550 days, inside the prime window) stay tokenless.
+    // Part of the gap is youth (pre-token median age 186 days; the category is new), so the
+    // cut stops at 0.92 instead of the wrapper floor: curators increasingly run as service
+    // businesses, but a young category can still convert late.
+    'Risk Curators': 0.92,
+    // [R2] 1.02 -> 0.95. Onchain Capital Allocator: 9/29 tokenized (31%), 5/13 at >= $50M
+    // (38%), and its pre-token members are not young (median age 517 days, none of the big
+    // ones past the prime window yet still tokenless at $1.5B TVL). Allocators often sit
+    // under a parent that already has a token; a small discount, not a deep one, because
+    // several of the largest allocators in the snapshot did launch.
+    'Onchain Capital Allocator': 0.95,
     Restaking: 1.0,
     'Liquidity Manager': 1.0,
-    Indexes: 1.0,
-    Chain: 0.95,
+    // [R2] 0.90 -> 1.00. Basis Trading was discounted as issuer funds, but it tokenizes at
+    // 13/21 (62%) and 6/9 at >= $50M (67%) — above the snapshot average (55% / 59%) on a
+    // real sample (n=21), with tokenized and pre-token ages alike (~512 vs ~422 days), so
+    // the gap is not an age artifact. The discount is removed; no premium, because several
+    // large basis funds are still issuer balance sheets.
+    'Basis Trading': 1.0,
+    // [R2] 0.95 -> 0.88. Chain: 3/8 tokenized (38%), 1/3 at >= $50M, and its pre-token
+    // members are old (median age 872 days) — chains that were going to launch a token
+    // mostly have; the survivors increasingly are foundations or app-chains whose token,
+    // if any, belongs to a parent. Still above the wrapper tier: a chain token is a
+    // normal end state when it comes.
+    Chain: 0.88,
     Insurance: 0.95,
-    'Basis Trading': 0.9,
     Payments: 0.9,
     'Governance Incentives': 0.9,
-    'Cross Chain Bridge': 0.9,
     'OTC Marketplace': 0.9,
-    RWA: 0.85,
+    // [R2] 0.85 -> 0.90. RWA tokenizes at 17/33 (52%), 8/16 at >= $50M — the snapshot
+    // average, not the deep discount round 1 assumed; pre-token RWAs are as large as
+    // tokenized ones (median $59M vs $47M TVL). A small discount remains because an RWA
+    // protocol's product is typically a tokenized asset issued under someone else's
+    // balance sheet, but 0.85 priced it like a wrapper, which the rate does not support.
+    RWA: 0.9,
     'Staking Pool': 0.85,
     CeDeFi: 0.85,
     'Crypto Card Issuer': 0.85,
@@ -143,7 +193,7 @@ export const MODEL: ModelConstants = {
 };
 
 /** The model's version label: the dashboard names it and the rules quote it. */
-export const MODEL_VERSION = 'radar-2';
+export const MODEL_VERSION = 'radar-3';
 
 /** How many live-token protocols the Live token view carries, by market cap. */
 export const LIVE_ROWS = 24;
