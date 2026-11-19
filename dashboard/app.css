@@ -88,6 +88,13 @@ tbody tr[data-selected="true"] { background: color-mix(in srgb, var(--accent) 8%
 .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .name { display: grid; gap: 2px; }
 .name b { font-weight: 600; }
+.name .meta { display: flex; align-items: center; gap: var(--step-2); flex-wrap: wrap; }
+.chip {
+  display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px;
+  border: 1px solid var(--border); border-radius: 999px;
+  color: var(--muted); font-family: var(--font-num); font-size: 11px; white-space: nowrap;
+}
+.chip.watch { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
 .sub { color: var(--muted); font-size: 12px; }
 .pos { color: var(--accent); }
 .neg { color: var(--negative); }
@@ -123,6 +130,9 @@ tbody tr[data-selected="true"] { background: color-mix(in srgb, var(--accent) 8%
 .equation { display: grid; gap: var(--step-2); font-family: var(--font-num); font-size: 13px; }
 .equation div { display: flex; justify-content: space-between; gap: var(--step-3); }
 .equation span { color: var(--muted); }
+.equation div.total { border-top: 1px solid var(--border); padding-top: var(--step-2); }
+.equation div.total span { color: var(--ink); }
+.equation div.total b { font-size: 15px; }
 .steps { margin: 0; padding-left: var(--step-5); display: grid; gap: var(--step-3); }
 .steps li { padding-left: var(--step-1); }
 .steps b { display: block; font-weight: 500; }
