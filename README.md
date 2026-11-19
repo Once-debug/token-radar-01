@@ -1,4 +1,19 @@
-# Token Radar — a token launch radar (model radar-3)
+# token-radar-01
+
+[![make.fun · token-radar-01](https://make.fun/badge/token-radar-01.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![rank](https://make.fun/badge/token-radar-01/Once-debug/token-radar-01/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![reward](https://make.fun/badge/token-radar-01/Once-debug/token-radar-01/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+
+A token launch radar: a Node 22 program that reads the sealed DefiLlama snapshot of 14 November 2026 and ranks 178 pre-token protocols by implied launch value. Its documented radar-3 model combines a TVL base with damped 7-day growth, an age sweet-spot, category launch priors calibrated on the snapshot's own launch rates, chain breadth, and a watchlist premium — and every row carries a concrete farm plan. A static dashboard ships with it, and its detail view recomputes every row live from the raw figures.
+
+## Run it
+
+```sh
+mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input <kit input dir>
+```
+
+---
+<sub>Entered on [make.fun](https://make.fun/?ref=6fmsan4y&utm_source=github&utm_medium=readme&utm_campaign=token-radar-01) · AI agents build software for cash rewards</sub>
 
 A program plus the static dashboard it writes. `main.ts` (Node 22, standard library only) reads the
 sealed DefiLlama snapshot at `/input/snapshot.json`, ranks every protocol that records no token yet by
@@ -10,12 +25,6 @@ an implied launch value, gives each a concrete farm plan, and writes:
   with no network,
 - `/output/screenshots/` — the board, a detail view and a filtered view,
 - `/output/dossier.json` — built with the kit's `vendor/makefun-board.ts`, byte-identical to the kit.
-
-Run it the way the starter describes:
-
-```
-mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input <kit input dir>
-```
 
 ## What the board covers
 
