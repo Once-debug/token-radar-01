@@ -4,7 +4,7 @@
 [![rank](https://make.fun/badge/token-radar-01/Once-debug/token-radar-01/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
 [![reward](https://make.fun/badge/token-radar-01/Once-debug/token-radar-01/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
 
-A token launch radar: a Node 22 program that reads the sealed DefiLlama snapshot of 14 November 2026 and ranks 178 pre-token protocols by implied launch value. Its documented radar-3 model combines a TVL base with damped 7-day growth, an age sweet-spot, category launch priors calibrated on the snapshot's own launch rates, chain breadth, and a watchlist premium — and every row carries a concrete farm plan. A static dashboard ships with it, and its detail view recomputes every row live from the raw figures.
+A token launch radar: a Node 22 program that reads the sealed DefiLlama snapshot of 14 November 2026 and ranks 178 pre-token protocols by implied launch value. Its documented radar-4 model combines a launch multiple measured on the snapshot's own traded protocols with damped 7-day growth, an age sweet-spot, category launch priors calibrated on the snapshot's own launch rates, chain breadth, and a watchlist premium — and every row carries a concrete farm plan. A static dashboard ships with it, and its detail view recomputes every row live from the raw figures.
 
 ## Run it
 
@@ -53,12 +53,12 @@ One function scores every row; no protocol name is special-cased anywhere. The i
 product of five multipliers on a TVL base, each derived from the snapshot's own figures:
 
 ```
-implied = max(1, round( tvl_usd × 0.25 × growth × maturity × category × breadth × watchlist ))
+implied = max(1, round( tvl_usd × launch_multiple × growth × maturity × category × breadth × watchlist ))
 ```
 
 | Factor | Definition | Why |
 | --- | --- | --- |
-| Base | `tvl_usd × 0.25` | A launch is worth a fraction of the TVL standing behind it; a quarter is the conservative end of what comparable launches priced at. |
+| Base | `tvl_usd × launch multiple` (0.169 by default; 0.123–0.519 measured per category) | What a launched token is worth per TVL dollar, measured on the snapshot itself — the median market cap ÷ TVL of the protocols in it whose token already trades — not an asserted constant. See the launch-multiple table below. |
 | Growth | `1 + clamp(change_7d, −60, +120)/100 × 0.5` | One week of TVL momentum is a signal, not a trend, so it is damped to ×0.70…×1.60: it can reorder neighbours, never carry a row. |
 | Maturity | `0.55 + 0.55 × ageScore(age)` | The age sweet spot, below. |
 | Category | prior per category, 0.75–1.20 | Categories differ in whether a token is their normal end state; see below. |
@@ -102,7 +102,35 @@ and 4/5 at ≥ $50M — validate 1.08); Stablecoin Wrapper (0/2, both ≥ $50M �
 floor); and every category with n ≤ 3 in the snapshot, where the round-1 judgement stands
 rather than fitting noise.
 
-The combined non-TVL spread is roughly ×0.4 to ×2.7 — enough for the model, not TVL, to decide the
+**Launch multiples (round 3, radar-4).** radar-3 asserted a flat base of ×0.25 for every category.
+The snapshot itself prices launches: 144 of its protocols record a token with a market cap, and
+their market cap ÷ TVL medians differ by an order of magnitude across categories — lending tokens
+trade at a small fraction of the TVL behind them, DEX and basis tokens at several times that rate.
+radar-4 measures the base from those peers. For each category with at least four traded peers the
+multiple is the category median shrunk toward the snapshot-wide median with a prior strength of 8
+— `multiple = (n × median + 8 × 0.169) / (n + 8)` — clamped to 0.05–0.60:
+
+| Category | Traded peers | Median mcap ÷ TVL | Launch multiple |
+| --- | --- | --- | --- |
+| Cross Chain Bridge | 4 | 1.220 | **0.519** |
+| Basis Trading | 8 | 0.482 | **0.326** |
+| Dexs | 11 | 0.342 | **0.269** |
+| RWA | 9 | 0.275 | **0.225** |
+| Lending | 15 | 0.132 | **0.145** |
+| Yield | 13 | 0.121 | **0.139** |
+| Yield Aggregator | 5 | 0.050 | **0.123** |
+| Every other category | fewer than 4 | — | **0.169** (the snapshot-wide median over all 144) |
+
+Categories with fewer than four traded peers keep the snapshot-wide median: one or two
+observations are not a measurement (Prediction Market's single traded peer sits at 400× its TVL;
+Risk Curators' single peer at 2.98×). The multiple answers a different question from the category
+prior above it — the prior is how likely a category is to launch at all, the multiple is what a
+launched peer is worth per TVL dollar — and both are measured on the same snapshot, so neither is
+a hand-kept list. Each row's `board.json` record carries the base it was scored with, and the
+dashboard's detail view names the multiple and its peer count for the row's category.
+
+The combined non-TVL spread is roughly ×0.4 to ×2.7, and the measured launch multiples add a
+further ×0.7 to ×3.1 between categories — enough for the model, not TVL, to decide the
 order of any two protocols within an order of magnitude of each other, which is exactly where a
 ranking earns its keep. Every row of `board.json` carries its five multipliers, and the dashboard's
 detail view shows the same breakdown and recomputes the row from the raw figures to prove the page
@@ -112,11 +140,15 @@ and the board are the same arithmetic.
 
 Each row carries a six-step plan derived from its own record, never a hand-written list: the opening
 action follows the category (supply to a lending market, provide liquidity to a DEX, restake, buy
-cover, …), the weekly qualifying action follows it too (borrow-and-repay cycles for lending, swaps
-for a DEX, small trades for perps), the capital follows the protocol's TVL tier ($50–$250), the gas
+cover, …), the weekly qualifying action follows it too and is sized from the plan's capital
+(borrow-and-repay cycles of about 20% of the position for lending, swaps of about a fifth of it for
+a DEX, small trades for perps), the capital follows the protocol's TVL tier ($50–$250), the gas
 figures follow its first chain's band (Ethereum ≈ $12, Solana < $1, other chains ≈ $4), and the hold
 follows its age — younger protocols get a longer qualifying window, and the step says how long the
-protocol has run with no token on record.
+protocol has run with no token on record. Two more elements come from the row itself: a protocol
+live on several chains gets a second-chain repetition step with its own amount (half the capital on
+its second chain), and the hold step reads the protocol's own week — a TVL fall of 20% or more adds
+a watch-the-exit caution, a rise of 30% or more adds a do-not-chase warning.
 
 ## The dashboard
 
@@ -127,6 +159,7 @@ The board is sortable on every column and filterable by search text, category, a
 (watchlist / early radar / both); every row opens a detail drawer with a plain-language verdict
 (strongest lift, main drag), a bar-scaled score breakdown, the live-check proof, and the farm
 plan; a Live token tab keeps already-trading protocols visibly separate. The model panel states
-the whole formula as five factor cards and renders all 33 category priors grouped by band
+the whole formula as six factor cards, renders the seven measured launch multiples with their
+traded-peer counts, and renders all 33 category priors grouped by band
 (above / at / below neutral) with scaled bars, instead of a single running list. The page runs
 with no network.

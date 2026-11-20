@@ -101,8 +101,10 @@ writeFileSync(join(out, 'dossier.json'), buildDossier(out, { text_max_bytes: TEX
 //   - each row's implied value is the product its own record claims — TVL
 //     times the base multiple times the five multipliers printed on the
 //     row — within the slack those multipliers' four decimals allow;
-//   - those multipliers agree with the model data.js publishes: growth from
-//     the row's clamped 7-day change, maturity from its age through the
+//   - those multipliers agree with the model data.js publishes: the base
+//     from the published launch-multiple table for the row's category (the
+//     snapshot-wide median where the table names none), growth from the
+//     row's clamped 7-day change, maturity from its age through the
 //     published age curve, category from the published table, breadth from
 //     its chain count, the watchlist factor either 1 or the bonus;
 //   - data.js parses, declares the same board size, and carries the same
@@ -166,8 +168,10 @@ function verifyOutputs(): void {
     }
 
     const m = row.model;
-    if (m.base_multiple !== published.base_multiple) {
-      selfCheckFail(`${row.slug} uses base multiple ${m.base_multiple}, the published model uses ${published.base_multiple}`);
+    const publishedBase =
+      row.category === null ? published.base_multiple : (published.category_base_multiples[row.category] ?? published.base_multiple);
+    if (Math.abs(m.base_multiple - publishedBase) > 1e-9) {
+      selfCheckFail(`${row.slug} uses base multiple ${m.base_multiple}, the published model gives its category ${publishedBase}`);
     }
     if (m.age_days !== row.age_days) selfCheckFail(`${row.slug} states its age twice and disagrees with itself`);
 

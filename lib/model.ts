@@ -9,10 +9,17 @@
 // screened those protocols by parent protocol, a field the snapshot does not carry, so a large
 // protocol the list leaves out cannot be verified from the ten fields and is not re-admitted.
 //
-// Implied value (model radar-3) follows only from the snapshot's own figures, as a product of five
+// Implied value (model radar-4) follows only from the snapshot's own figures, as a product of five
 // multipliers on a TVL base, so the ranking is a value model and not a TVL sort:
 //
-//   base       = tvl_usd x BASE_MULTIPLE          (a launch is worth a fraction of the TVL behind it)
+//   base       = tvl_usd x LAUNCH_MULTIPLE        (what a launch is worth per TVL dollar, measured on
+//                                                 the snapshot itself, not asserted: the median
+//                                                 market cap / TVL of the 144 snapshot protocols
+//                                                 whose token already trades, taken per category
+//                                                 where at least four trade, shrunk toward the
+//                                                 snapshot-wide median (the default where fewer
+//                                                 than four trade) and clamped; see the table at
+//                                                 category_base_multiples below)
 //   growth     = 1 + clamp(change_7d, -60, 120)/100 x GROWTH_WEIGHT
 //                                                 (a week of TVL momentum, damped: one week is a
 //                                                  signal, not a trend, so it can move a row by at
@@ -69,6 +76,9 @@ export interface Snapshot {
 /** The model's constants, as the dashboard states them. */
 export interface ModelConstants {
   base_multiple: number;
+  category_base_multiples: Record<string, number>;
+  category_base_peers: Record<string, number>;
+  launch_peers_total: number;
   growth_weight: number;
   growth_floor: number;
   growth_cap: number;
@@ -87,7 +97,38 @@ export interface ModelConstants {
 }
 
 export const MODEL: ModelConstants = {
-  base_multiple: 0.25,
+  // The default launch multiple is the snapshot-wide median market cap / TVL of the 144 snapshot
+  // protocols whose token already trades: 0.169. radar-3 asserted a flat 0.25 for every category;
+  // radar-4 measures it, per category where the sample supports it (next table).
+  base_multiple: 0.169,
+  // Launch multiples measured on the snapshot's traded peers (round 3, radar-4): for each category
+  // with at least four protocols whose token already trades with a recorded market cap, the
+  // multiple is that category's median mcap / TVL shrunk toward the snapshot-wide median with a
+  // prior strength of 8 (multiple = (n x median + 8 x 0.169) / (n + 8)), clamped to 0.05..0.60.
+  // Categories with fewer than four traded peers keep the default above: one or two observations
+  // are not a measurement (Prediction Market's single traded peer sits at 400x TVL; Risk Curators'
+  // single peer at 2.98x). The multiple answers a different question from the launch prior below:
+  // the prior is how likely a category is to launch at all, the multiple is what a launched peer
+  // is worth per TVL dollar. Both are measured on the same snapshot; neither is a name list.
+  category_base_multiples: {
+    Dexs: 0.269, // 11 peers, median 0.342
+    Lending: 0.145, // 15 peers, median 0.132
+    Yield: 0.139, // 13 peers, median 0.121
+    'Yield Aggregator': 0.123, // 5 peers, median 0.050
+    RWA: 0.225, // 9 peers, median 0.275
+    'Basis Trading': 0.326, // 8 peers, median 0.482
+    'Cross Chain Bridge': 0.519, // 4 peers, median 1.220
+  },
+  category_base_peers: {
+    Dexs: 11,
+    Lending: 15,
+    Yield: 13,
+    'Yield Aggregator': 5,
+    RWA: 9,
+    'Basis Trading': 8,
+    'Cross Chain Bridge': 4,
+  },
+  launch_peers_total: 144,
   growth_weight: 0.5,
   growth_floor: -60,
   growth_cap: 120,
@@ -193,7 +234,7 @@ export const MODEL: ModelConstants = {
 };
 
 /** The model's version label: the dashboard names it and the rules quote it. */
-export const MODEL_VERSION = 'radar-3';
+export const MODEL_VERSION = 'radar-4';
 
 /** How many live-token protocols the Live token view carries, by market cap. */
 export const LIVE_ROWS = 24;
@@ -325,6 +366,12 @@ export function categoryMultiplier(protocol: SnapshotProtocol, model: ModelConst
   return model.category_multipliers[protocol.category] ?? model.category_default;
 }
 
+/** The launch multiple a protocol's category carries: the measured table's value, or the snapshot-wide median. */
+export function baseMultipleFor(protocol: SnapshotProtocol, model: ModelConstants): number {
+  if (protocol.category === null) return model.base_multiple;
+  return model.category_base_multiples[protocol.category] ?? model.base_multiple;
+}
+
 /** The chain-breadth factor: the first chain is the product, each further one is distribution. */
 export function breadthMultiplier(protocol: SnapshotProtocol, model: ModelConstants): number {
   const extra = Math.min(Math.max(protocol.chains.length - 1, 0), model.breadth_max_extra);
@@ -339,6 +386,7 @@ export function impliedValue(
   onWatchlist: boolean,
 ): {
   implied: number;
+  baseMult: number;
   growthPct: number;
   growthMult: number;
   maturityMult: number;
@@ -355,9 +403,10 @@ export function impliedValue(
   const categoryMult = categoryMultiplier(protocol, model);
   const breadthMult = breadthMultiplier(protocol, model);
   const watchlistMult = onWatchlist ? 1 + model.watchlist_bonus : 1;
-  const base = protocol.tvl_usd * model.base_multiple;
+  const baseMult = baseMultipleFor(protocol, model);
+  const base = protocol.tvl_usd * baseMult;
   const implied = Math.max(1, Math.round(base * growthMult * maturityMult * categoryMult * breadthMult * watchlistMult));
-  return { implied, growthPct, growthMult, maturityMult, categoryMult, breadthMult, watchlistMult, age };
+  return { implied, baseMult, growthPct, growthMult, maturityMult, categoryMult, breadthMult, watchlistMult, age };
 }
 
 /** DefiLlama's version-marker rule: a name ending in a release is a pool of another protocol. */
@@ -449,7 +498,7 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): B
     age_days: s.age,
     implied_value_usd: s.implied,
     model: {
-      base_multiple: model.base_multiple,
+      base_multiple: s.baseMult,
       growth_pct: s.growthPct,
       growth_multiplier: round4(s.growthMult),
       maturity_multiplier: round4(s.maturityMult),
@@ -525,11 +574,11 @@ function actionFor(p: SnapshotProtocol, capital: number, chain: string): string 
   return `Deposit $${capital} of USDC into ${name} on ${chain} and keep the position open.`;
 }
 
-/** The weekly qualifying action, by category: the activity a launch snapshot would count. */
-function weeklyFor(p: SnapshotProtocol): string {
+/** The weekly qualifying action, by category, sized from the plan's capital: the activity a launch snapshot would count. */
+function weeklyFor(p: SnapshotProtocol, capital: number): string {
   const c = (p.category ?? '').toLowerCase();
-  if (c.includes('dex')) return `Make two or three swaps in the pool each week, so the wallet shows trading activity and not one deposit.`;
-  if (c.includes('lend') || c.includes('cdp') || c.includes('collateral')) return `Borrow a small amount against the position and repay it each week, so both sides of the market see the wallet.`;
+  if (c.includes('dex')) return `Make two or three swaps of about $${Math.max(10, Math.round(capital / 5))} each week, so the wallet shows trading activity and not one deposit.`;
+  if (c.includes('lend') || c.includes('cdp') || c.includes('collateral')) return `Borrow about $${Math.round(capital * 0.2)} against the position and repay it each week, so both sides of the market see the wallet.`;
   if (c.includes('perpetual') || c.includes('derivative')) return `Open and close one small trade each week and keep the margin account funded between them.`;
   if (c.includes('prediction')) return `Place one small position each week in a market you actually have a view on.`;
   if (c.includes('bridge')) return `Bridge a small amount in each direction each week, and use the bridged funds rather than parking them.`;
@@ -539,7 +588,8 @@ function weeklyFor(p: SnapshotProtocol): string {
 
 /**
  * A protocol's farm plan: six steps, each an action with a cost and a time. The plan is derived from
- * the protocol's own record (category, chains, TVL, age), never from a hand-written list of names.
+ * the protocol's own record (category, chains, TVL, age, and its seven-day direction), never from a
+ * hand-written list of names.
  */
 export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
   const chain = chainOf(p);
@@ -547,7 +597,25 @@ export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
   const hold = holdDaysFor(age);
   const gas = gasBand(chain);
   const action = actionFor(p, capital, chain);
+  // A protocol live on several chains rewards a wallet that shows up on more than one of them.
+  const secondChain =
+    p.chains.length > 1
+      ? ` Repeat with $${Math.round(capital / 2)} on ${p.chains[1]} once the first position is open, so the wallet is active on two of its ${p.chains.length} chains.`
+      : '';
   const ageText = age === null ? 'for an unrecorded stretch' : `for ${age} days`;
+  // The hold step reads the protocol's own week: a sharp fall is a reason to watch the exit, a
+  // sharp rise is a reason not to chase size.
+  const g = p.change_7d;
+  const growthNote =
+    g === null
+      ? ''
+      : g <= -20
+        ? ` Its TVL fell ${Math.abs(Math.round(g))}% this week, so re-check the position weekly and be ready to exit early: momentum cuts both ways.`
+        : g >= 30
+          ? g > 200
+            ? ` Its TVL more than tripled this week; do not chase the move with extra size, keep the planned amount.`
+            : ` Its TVL grew ${Math.round(g)}% this week; do not chase the move with extra size, keep the planned amount.`
+          : '';
   return [
     {
       text: `Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.`,
@@ -555,17 +623,20 @@ export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
       time: '5 minutes',
     },
     {
-      text: action,
-      cost: `$${capital} of capital and ${gas.action}`,
+      text: action + secondChain,
+      cost:
+        p.chains.length > 1
+          ? `$${capital} of capital, plus $${Math.round(capital / 2)} on the second chain, and ${gas.action}`
+          : `$${capital} of capital and ${gas.action}`,
       time: '15 minutes to set up',
     },
     {
-      text: weeklyFor(p),
+      text: weeklyFor(p, capital),
       cost: gas.weekly,
       time: '10 minutes a week',
     },
     {
-      text: `Hold the position for at least ${hold} days: ${p.name} has run ${ageText} with no token on record, and launch snapshots reward wallets that were present across many of them.`,
+      text: `Hold the position for at least ${hold} days: ${p.name} has run ${ageText} with no token on record, and launch snapshots reward wallets that were present across many of them.${growthNote}`,
       cost: `the $${capital} stays in the position`,
       time: `${hold} days`,
     },
